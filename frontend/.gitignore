@@ -1,0 +1,20 @@
+# Python
+backend/venv/
+backend/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# Data - too large for GitHub
+data/
+
+# Models - will be regenerated
+
+# Node
+frontend/node_modules/
+frontend/build/
+
+# OS
+.DS_Store
+Thumbs.db
