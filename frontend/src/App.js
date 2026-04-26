@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
+import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 
 const WS_URL = "wss://sentinel-ai.up.railway.app/ws";
 
@@ -15,7 +15,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const wsRef = useRef(null);
 
-  useEffect(() => { connect(); return () => wsRef.current?.close(); }, []);
+  useEffect(() => { connect(); return () => wsRef.current?.close(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function connect() {
     const ws = new WebSocket(WS_URL);
