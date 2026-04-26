@@ -1,7 +1,13 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from .model import predict_transaction, models_loaded
-from .simulator import get_random_transaction
+
+try:
+    from .model import predict_transaction, models_loaded
+    from .simulator import get_random_transaction
+except ImportError:
+    from model import predict_transaction, models_loaded
+    from simulator import get_random_transaction
+
 import asyncio
 import json
 import uuid
