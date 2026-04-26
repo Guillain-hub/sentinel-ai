@@ -1,13 +1,17 @@
+from pathlib import Path
 import pickle
 import numpy as np
 import shap
 import pandas as pd
 
-with open("models/fraud_model.pkl", "rb") as f:
+BASE_DIR = Path(__file__).resolve().parent
+MODEL_DIR = BASE_DIR / "models"
+
+with open(MODEL_DIR / "fraud_model.pkl", "rb") as f:
     model = pickle.load(f)
-with open("models/scaler.pkl", "rb") as f:
+with open(MODEL_DIR / "scaler.pkl", "rb") as f:
     scaler = pickle.load(f)
-with open("models/feature_names.pkl", "rb") as f:
+with open(MODEL_DIR / "feature_names.pkl", "rb") as f:
     feature_names = pickle.load(f)
 
 explainer = shap.TreeExplainer(model)
