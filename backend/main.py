@@ -1,6 +1,6 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from model import predict_transaction
+from model import predict_transaction, models_loaded
 from simulator import get_random_transaction
 import asyncio
 import json
@@ -24,6 +24,13 @@ stats = {
     "legitimate": 0,
     "total_amount_protected": 0.0
 }
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "model_loaded": models_loaded,
+    }
 
 @app.get("/")
 def root():
