@@ -1,12 +1,5 @@
-import pandas as pd
 import numpy as np
 import random
-
-# Load real data to sample from
-df = pd.read_csv(r"C:\Users\User\sentinel-ai\data\creditcard.csv")
-
-legitimate = df[df["Class"] == 0]
-fraudulent = df[df["Class"] == 1]
 
 MERCHANT_NAMES = [
     "Kigali Supermarket", "MTN Mobile Money", "Equity Bank ATM",
@@ -22,20 +15,19 @@ LOCATIONS = [
 ]
 
 def get_random_transaction():
-    # 95% legitimate, 5% fraud — realistic ratio for demo
     is_fraud = random.random() < 0.05
     
-    if is_fraud:
-        row = fraudulent.sample(1).iloc[0]
-    else:
-        row = legitimate.sample(1).iloc[0]
-
-    features = {col: float(row[col]) for col in df.columns if col != "Class"}
+    # Generate synthetic transaction features (V1-V28 + Time + Amount)
+    features = {}
+    for i in range(1, 29):
+        features[f"V{i}"] = np.random.normal(0, 1) if not is_fraud else np.random.normal(random.choice([-3, 3]), 1.5)
     
-    # Add display metadata
+    features["Time"] = random.uniform(0, 172800)
+    features["Amount"] = random.uniform(200, 5000) if is_fraud else random.uniform(1, 500)
+    
     features["_merchant"] = random.choice(MERCHANT_NAMES)
     features["_location"] = random.choice(LOCATIONS)
-    features["_amount_display"] = round(abs(features["Amount"]), 2)
-    features["_actual_label"] = int(row["Class"])
+    features["_amount_display"] = round(features["Amount"], 2)
+    features["_actual_label"] = 1 if is_fraud else 0
 
     return features
