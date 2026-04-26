@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from "recharts";
 
-const WS_URL = "wss://sentinel-ai.up.railway.app/ws";
+const WS_URL = "wss://joyful-adventure-production-fcac.up.railway.app/ws";
 
 const riskColor = (level) => ({ HIGH: "#ef4444", MEDIUM: "#f59e0b", LOW: "#22c55e" }[level] || "#6b7280");
 
