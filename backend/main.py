@@ -4,9 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 try:
     from .model import predict_transaction, models_loaded
     from .simulator import get_random_transaction
+    from .behavioral import generate_session
 except ImportError:
     from model import predict_transaction, models_loaded
     from simulator import get_random_transaction
+    from behavioral import generate_session
 
 import asyncio
 import json
@@ -100,3 +102,34 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         print("Dashboard disconnected")
+
+behavioral_history = []
+behavioral_stats = {"total": 0, "flagged": 0, "safe": 0}
+
+@app.websocket("/ws/behavioral")
+async def behavioral_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("Behavioral AI dashboard connected")
+    try:
+        while True:
+            session = generate_session()
+            behavioral_stats["total"] += 1
+            if session["is_flagged"]:
+                behavioral_stats["flagged"] += 1
+            else:
+                behavioral_stats["safe"] += 1
+            behavioral_history.append(session)
+            if len(behavioral_history) > 100:
+                behavioral_history.pop(0)
+            await websocket.send_text(json.dumps(session))
+            await asyncio.sleep(2)
+    except WebSocketDisconnect:
+        print("Behavioral dashboard disconnected")
+
+@app.get("/behavioral/stats")
+def get_behavioral_stats():
+    return behavioral_stats
+
+@app.get("/behavioral/sessions")
+def get_behavioral_sessions():
+    return behavioral_history[-50:]
