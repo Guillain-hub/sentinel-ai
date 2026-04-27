@@ -158,7 +158,7 @@ export default function App() {
         <div style={{ padding: "16px 28px", borderBottom: "1px solid #1e2a4a", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#0a0f1e" }}>
           <div>
             <h1 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
-              {{ dashboard: "Live Security Dashboard", transactions: "All Transactions", threats: "Threat Detection", behavioral: "Behavioral AI Monitor", reports: "Reports", settings: "Settings" }[activeTab]}
+              {{ dashboard: "Live Security Dashboard", transactions: "All Transactions", threats: "Threat Detection", api: "API Protection", behavioral: "Behavioral AI Monitor", reports: "Reports", settings: "Settings" }[activeTab]}
             </h1>
             <p style={{ fontSize: 12, color: "#4b6cb7", margin: "2px 0 0 0" }}>Real-time AI fraud detection — East Africa Banking Network</p>
           </div>
@@ -516,7 +516,7 @@ export default function App() {
                 {[
                   { name: "✅ Module 1: Fraud Detection", done: true },
                   { name: "✅ Module 2: Behavioral AI", done: true },
-                  { name: "🔜 Module 3: API Protection", done: false },
+                  { name: "✅ Module 3: API Protection", done: true },
                   { name: "🔜 Module 4: Threat Intelligence", done: false },
                   { name: "🔜 Module 5: Bank Integration API", done: false },
                   { name: "🔜 Mobile App Dashboard", done: false },
