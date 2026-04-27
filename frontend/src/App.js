@@ -16,13 +16,17 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sessions, setSessions] = useState([]);
   const [behavioralStats, setBehavioralStats] = useState({ total: 0, flagged: 0, safe: 0 });
+  const [apiEvents, setApiEvents] = useState([]);
+  const [apiStats, setApiStats] = useState({ total: 0, blocked: 0, safe: 0, attacks: 0 });
   const wsRef = useRef(null);
   const wsBehavioralRef = useRef(null);
+  const wsApiRef = useRef(null);
 
   useEffect(() => {
     connect();
     connectBehavioral();
-    return () => { wsRef.current?.close(); wsBehavioralRef.current?.close(); };
+    connectApiProtection();
+    return () => { wsRef.current?.close(); wsBehavioralRef.current?.close(); wsApiRef.current?.close(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function connect() {
@@ -63,6 +67,22 @@ export default function App() {
     };
   }
 
+  function connectApiProtection() {
+    const ws = new WebSocket("wss://joyful-adventure-production-fcac.up.railway.app/ws/api-protection");
+    wsApiRef.current = ws;
+    ws.onclose = () => setTimeout(connectApiProtection, 3000);
+    ws.onmessage = (e) => {
+      const event = JSON.parse(e.data);
+      setApiEvents(prev => [event, ...prev].slice(0, 50));
+      setApiStats(prev => ({
+        total: prev.total + 1,
+        blocked: prev.blocked + (event.is_blocked ? 1 : 0),
+        safe: prev.safe + (!event.is_blocked ? 1 : 0),
+        attacks: prev.attacks + (event.attack_type ? 1 : 0),
+      }));
+    };
+  }
+
   const fraudRate = stats.total > 0 ? ((stats.fraud_detected / stats.total) * 100).toFixed(1) : "0.0";
   const pieData = [{ name: "Legitimate", value: stats.legitimate }, { name: "Fraud", value: stats.fraud_detected }];
   const scoreColor = securityScore > 80 ? "#22c55e" : securityScore > 60 ? "#f59e0b" : "#ef4444";
@@ -89,6 +109,7 @@ export default function App() {
             { id: "dashboard", icon: "⬡", label: "Dashboard" },
             { id: "transactions", icon: "⇄", label: "Transactions" },
             { id: "threats", icon: "◈", label: "Threat Detection" },
+            { id: "api", icon: "⬢", label: "API Protection" },
             { id: "behavioral", icon: "◉", label: "Behavioral AI" },
             { id: "reports", icon: "▤", label: "Reports" },
             { id: "settings", icon: "⚙", label: "Settings" },
@@ -113,7 +134,7 @@ export default function App() {
           {[
             { name: "Fraud Detection", active: true },
             { name: "Behavioral AI", active: true },
-            { name: "API Protection", active: false },
+            { name: "API Protection", active: true },
             { name: "Threat Intel", active: false },
           ].map(m => (
             <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
@@ -355,6 +376,82 @@ export default function App() {
           </>}
 
           {/* ── REPORTS TAB ── */}
+          {activeTab === "api" && <>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+              {[
+                { label: "API Calls Monitored", value: apiStats.total.toLocaleString(), color: "#60a5fa" },
+                { label: "Attacks Detected", value: apiStats.attacks.toLocaleString(), color: "#ef4444" },
+                { label: "Requests Blocked", value: apiStats.blocked.toLocaleString(), color: "#f59e0b" },
+                { label: "Safe Requests", value: apiStats.safe.toLocaleString(), color: "#22c55e" },
+              ].map((c, i) => (
+                <div key={i} style={card()}>
+                  <div style={{ fontSize: 11, color: "#4b6cb7", fontWeight: 600, marginBottom: 8 }}>{c.label.toUpperCase()}</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: c.color }}>{c.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div style={card()}>
+              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>
+                🔐 Live API Event Monitor
+                <span style={{ marginLeft: 8, fontSize: 10, color: "#22c55e", background: "#052e16", padding: "2px 8px", borderRadius: 10 }}>● LIVE</span>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "90px 80px 1fr 160px 90px 90px 100px", gap: 8, padding: "8px 12px", borderBottom: "1px solid #1e2a4a", marginBottom: 8 }}>
+                {["STATUS", "METHOD", "ENDPOINT", "ATTACK TYPE", "STATUS CODE", "RISK", "IP"].map(h => (
+                  <div key={h} style={{ fontSize: 10, color: "#4b6cb7", fontWeight: 600 }}>{h}</div>
+                ))}
+              </div>
+
+              <div style={{ maxHeight: 450, overflowY: "auto" }}>
+                {apiEvents.map((e, i) => (
+                  <div key={e.id + i} style={{
+                    display: "grid", gridTemplateColumns: "90px 80px 1fr 160px 90px 90px 100px", gap: 8,
+                    padding: "10px 12px", borderRadius: 8, marginBottom: 4,
+                    background: e.is_blocked ? "linear-gradient(90deg, #1c050522, #1f0a0a)" : i % 2 === 0 ? "#ffffff05" : "transparent",
+                    border: e.is_blocked ? "1px solid #7f1d1d44" : "1px solid transparent",
+                  }}>
+                    <div>
+                      {e.is_blocked
+                        ? <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#1c0505", padding: "3px 8px", borderRadius: 4 }}>🚫 BLOCKED</span>
+                        : <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", background: "#052e16", padding: "3px 8px", borderRadius: 4 }}>✓ ALLOWED</span>
+                      }
+                    </div>
+                    <div style={{ alignSelf: "center" }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4,
+                        background: e.method === "DELETE" ? "#ef444422" : e.method === "POST" ? "#3b82f622" : "#ffffff11",
+                        color: e.method === "DELETE" ? "#ef4444" : e.method === "POST" ? "#60a5fa" : "#94a3b8"
+                      }}>{e.method}</span>
+                    </div>
+                    <div style={{ fontSize: 11, color: "white", alignSelf: "center", fontFamily: "monospace" }}>{e.endpoint}</div>
+                    <div style={{ fontSize: 11, color: e.attack_type ? "#f59e0b" : "#4b6cb7", alignSelf: "center" }}>
+                      {e.attack_type ? e.attack_type.replace(/_/g, " ").toUpperCase() : "—"}
+                    </div>
+                    <div style={{ alignSelf: "center" }}>
+                      <span style={{
+                        fontSize: 11, fontWeight: 700,
+                        color: e.status_code >= 500 ? "#ef4444" : e.status_code >= 400 ? "#f59e0b" : "#22c55e"
+                      }}>{e.status_code}</span>
+                    </div>
+                    <div style={{ alignSelf: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: e.risk_score > 0.6 ? "#ef4444" : e.risk_score > 0.3 ? "#f59e0b" : "#22c55e" }}>
+                        {(e.risk_score * 100).toFixed(0)}%
+                      </div>
+                      <div style={{ height: 3, background: "#1e2a4a", borderRadius: 2, marginTop: 3 }}>
+                        <div style={{ height: "100%", width: `${e.risk_score * 100}%`, background: e.risk_score > 0.6 ? "#ef4444" : e.risk_score > 0.3 ? "#f59e0b" : "#22c55e", borderRadius: 2 }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 10, color: "#64748b", alignSelf: "center", fontFamily: "monospace" }}>{e.ip}</div>
+                  </div>
+                ))}
+                {apiEvents.length === 0 && (
+                  <div style={{ textAlign: "center", padding: 40, color: "#334155" }}>Connecting to API Protection...</div>
+                )}
+              </div>
+            </div>
+          </>}
+
           {activeTab === "reports" && <>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
               <div style={card()}>
