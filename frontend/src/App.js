@@ -14,8 +14,33 @@ export default function App() {
   const [alerts, setAlerts] = useState([]);
   const [activeTab, setActiveTab] = useState("dashboard");
   const wsRef = useRef(null);
+  const [sessions, setSessions] = useState([]);
+  const [behavioralStats, setBehavioralStats] = useState({ total: 0, flagged: 0, safe: 0 });
+  const wsBehavioralRef = useRef(null);
 
-  useEffect(() => { connect(); return () => wsRef.current?.close(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    connect();
+    connectBehavioral();
+    return () => {
+      wsRef.current?.close();
+      wsBehavioralRef.current?.close();
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function connectBehavioral() {
+    const ws = new WebSocket("wss://joyful-adventure-production-fcac.up.railway.app/ws/behavioral");
+    wsBehavioralRef.current = ws;
+    ws.onclose = () => setTimeout(connectBehavioral, 3000);
+    ws.onmessage = (e) => {
+      const session = JSON.parse(e.data);
+      setSessions(prev => [session, ...prev].slice(0, 50));
+      setBehavioralStats(prev => ({
+        total: prev.total + 1,
+        flagged: prev.flagged + (session.is_flagged ? 1 : 0),
+        safe: prev.safe + (!session.is_flagged ? 1 : 0),
+      }));
+    };
+  }
 
   function connect() {
     const ws = new WebSocket(WS_URL);
@@ -141,6 +166,8 @@ export default function App() {
         {/* Scrollable Content */}
         <div style={{ flex: 1, overflow: "auto", padding: "24px 28px" }}>
 
+          {activeTab === "dashboard" && (
+          <>
           {/* Stat Cards */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
             {[
@@ -297,6 +324,79 @@ export default function App() {
             <div style={{ fontSize: 11, color: "#1e3a5f" }}>Sentinel AI v1.0 — Built for East African Banking Security</div>
             <div style={{ fontSize: 11, color: "#1e3a5f" }}>Powered by XGBoost + SHAP Explainability — 96.8% ROC-AUC</div>
           </div>
+          </>
+          )}
+
+          {activeTab === "behavioral" && (
+          <div>
+            {/* Stats */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 16, marginBottom: 24 }}>
+              {[
+                { label: "Sessions Monitored", value: behavioralStats.total, color: "#60a5fa" },
+                { label: "Anomalies Flagged", value: behavioralStats.flagged, color: "#ef4444" },
+                { label: "Safe Sessions", value: behavioralStats.safe, color: "#22c55e" },
+              ].map((card, i) => (
+                <div key={i} style={{ background: "#0f172a", border: "1px solid #1e2a4a", borderRadius: 12, padding: 20 }}>
+                  <div style={{ fontSize: 11, color: "#4b6cb7", fontWeight: 600, marginBottom: 8 }}>{card.label.toUpperCase()}</div>
+                  <div style={{ fontSize: 32, fontWeight: 800, color: card.color }}>{card.value}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Session Feed */}
+            <div style={{ background: "#0f172a", border: "1px solid #1e2a4a", borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "white", marginBottom: 16 }}>
+                Live Session Monitor
+                <span style={{ marginLeft: 12, fontSize: 10, color: "#22c55e", background: "#052e16", padding: "2px 8px", borderRadius: 10 }}>● LIVE</span>
+              </div>
+
+              {/* Header */}
+              <div style={{ display: "grid", gridTemplateColumns: "100px 120px 1fr 140px 100px 100px", gap: 8, padding: "8px 12px", borderBottom: "1px solid #1e2a4a", marginBottom: 8 }}>
+                {["STATUS", "USER", "LOCATION / DEVICE", "ANOMALY", "RISK", "TIME"].map(h => (
+                  <div key={h} style={{ fontSize: 10, color: "#4b6cb7", fontWeight: 600 }}>{h}</div>
+                ))}
+              </div>
+
+              <div style={{ maxHeight: 450, overflowY: "auto" }}>
+                {sessions.map((s, i) => (
+                  <div key={s.id + i} style={{
+                    display: "grid", gridTemplateColumns: "100px 120px 1fr 140px 100px 100px", gap: 8,
+                    padding: "10px 12px", borderRadius: 8, marginBottom: 4,
+                    background: s.is_flagged ? "linear-gradient(90deg, #1c050522, #1f0a0a)" : i % 2 === 0 ? "#ffffff05" : "transparent",
+                    border: s.is_flagged ? "1px solid #7f1d1d44" : "1px solid transparent",
+                  }}>
+                    <div>
+                      {s.is_flagged
+                        ? <span style={{ fontSize: 10, fontWeight: 700, color: "#ef4444", background: "#1c0505", padding: "3px 8px", borderRadius: 4 }}>🚨 FLAGGED</span>
+                        : <span style={{ fontSize: 10, fontWeight: 700, color: "#22c55e", background: "#052e16", padding: "3px 8px", borderRadius: 4 }}>✓ SAFE</span>
+                      }
+                    </div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "white", alignSelf: "center" }}>{s.user}</div>
+                    <div>
+                      <div style={{ fontSize: 12, color: "white" }}>{s.location}</div>
+                      <div style={{ fontSize: 11, color: "#4b6cb7" }}>{s.device}</div>
+                    </div>
+                    <div style={{ fontSize: 11, color: s.anomaly_type ? "#f59e0b" : "#4b6cb7", alignSelf: "center" }}>
+                      {s.anomaly_type ? s.anomaly_type.replace("_", " ").toUpperCase() : "—"}
+                    </div>
+                    <div style={{ alignSelf: "center" }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: s.risk_score > 0.6 ? "#ef4444" : s.risk_score > 0.3 ? "#f59e0b" : "#22c55e" }}>
+                        {(s.risk_score * 100).toFixed(0)}%
+                      </div>
+                      <div style={{ height: 3, background: "#1e2a4a", borderRadius: 2, marginTop: 3 }}>
+                        <div style={{ height: "100%", width: `${s.risk_score * 100}%`, background: s.risk_score > 0.6 ? "#ef4444" : s.risk_score > 0.3 ? "#f59e0b" : "#22c55e", borderRadius: 2 }} />
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 11, color: "#64748b", alignSelf: "center" }}>{s.timestamp}</div>
+                  </div>
+                ))}
+                {sessions.length === 0 && (
+                  <div style={{ textAlign: "center", padding: 40, color: "#334155" }}>Connecting to Behavioral AI...</div>
+                )}
+              </div>
+            </div>
+          </div>
+          )}
         </div>
       </div>
 
