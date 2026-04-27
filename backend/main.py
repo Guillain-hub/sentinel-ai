@@ -5,10 +5,12 @@ try:
     from .model import predict_transaction, models_loaded
     from .simulator import get_random_transaction
     from .behavioral import generate_session
+    from .api_protection import generate_api_event
 except ImportError:
     from model import predict_transaction, models_loaded
     from simulator import get_random_transaction
     from behavioral import generate_session
+    from api_protection import generate_api_event
 
 import asyncio
 import json
@@ -133,3 +135,35 @@ def get_behavioral_stats():
 @app.get("/behavioral/sessions")
 def get_behavioral_sessions():
     return behavioral_history[-50:]
+
+api_history_store = []
+api_stats = {"total": 0, "blocked": 0, "safe": 0, "attacks": 0}
+
+@app.websocket("/ws/api-protection")
+async def api_protection_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    print("API Protection dashboard connected")
+    try:
+        while True:
+            event = generate_api_event()
+            api_stats["total"] += 1
+            if event["is_blocked"]:
+                api_stats["blocked"] += 1
+                api_stats["attacks"] += 1
+            else:
+                api_stats["safe"] += 1
+            api_history_store.append(event)
+            if len(api_history_store) > 100:
+                api_history_store.pop(0)
+            await websocket.send_text(json.dumps(event))
+            await asyncio.sleep(1.2)
+    except WebSocketDisconnect:
+        print("API Protection dashboard disconnected")
+
+@app.get("/api-protection/stats")
+def get_api_stats():
+    return api_stats
+
+@app.get("/api-protection/events")
+def get_api_events():
+    return api_history_store[-50:]
