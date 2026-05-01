@@ -6,15 +6,18 @@ try:
     from .simulator import get_random_transaction
     from .behavioral import generate_session
     from .api_protection import generate_api_event
+    from .threat_intelligence import generate_threat, get_threat_stats
 except ImportError:
     from model import predict_transaction, models_loaded
     from simulator import get_random_transaction
     from behavioral import generate_session
     from api_protection import generate_api_event
+    from threat_intelligence import generate_threat, get_threat_stats
 
 import asyncio
 import json
 import uuid
+import random
 from datetime import datetime
 
 app = FastAPI(title="Sentinel AI - Security Platform")
@@ -53,6 +56,24 @@ def get_stats():
 @app.get("/transactions")
 def get_transactions():
     return transaction_history[-50:]
+
+@app.get("/threats/stats")
+def get_threats():
+    return get_threat_stats()
+
+@app.websocket("/ws/threats")
+async def threat_websocket(websocket: WebSocket):
+    await websocket.accept()
+    print("✅ Threat monitor connected!")
+    try:
+        while True:
+            threat = generate_threat()
+            await websocket.send_text(json.dumps(threat))
+            await asyncio.sleep(random.uniform(3, 8))
+    except WebSocketDisconnect:
+        print("Threat monitor disconnected")
+    except Exception as e:
+        print(f"Threat WebSocket error: {e}")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
