@@ -3,6 +3,7 @@ import { XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, AreaCh
 
 const WS_URL = "wss://joyful-adventure-production-fcac.up.railway.app/ws";
 const WS_BEHAVIORAL = "wss://joyful-adventure-production-fcac.up.railway.app/ws/behavioral";
+const THREAT_WS_URL = "wss://joyful-adventure-production-fcac.up.railway.app/ws/threats";
 
 const riskColor = (level) => ({ HIGH: "#ef4444", MEDIUM: "#f59e0b", LOW: "#22c55e" }[level] || "#6b7280");
 
@@ -13,6 +14,8 @@ export default function App() {
   const [connected, setConnected] = useState(false);
   const [securityScore, setSecurityScore] = useState(100);
   const [alerts, setAlerts] = useState([]);
+  const [threats, setThreats] = useState([]);
+  const [threatStats, setThreatStats] = useState({ total_threats: 0, critical: 0, high: 0, medium: 0, low: 0, blocked: 0 });
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sessions, setSessions] = useState([]);
   const [behavioralStats, setBehavioralStats] = useState({ total: 0, flagged: 0, safe: 0 });
@@ -21,12 +24,14 @@ export default function App() {
   const wsRef = useRef(null);
   const wsBehavioralRef = useRef(null);
   const wsApiRef = useRef(null);
+  const threatWsRef = useRef(null);
 
   useEffect(() => {
     connect();
     connectBehavioral();
     connectApiProtection();
-    return () => { wsRef.current?.close(); wsBehavioralRef.current?.close(); wsApiRef.current?.close(); };
+    connectThreats();
+    return () => { wsRef.current?.close(); wsBehavioralRef.current?.close(); wsApiRef.current?.close(); threatWsRef.current?.close(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function connect() {
@@ -83,6 +88,25 @@ export default function App() {
     };
   }
 
+  function connectThreats() {
+    const ws = new WebSocket(THREAT_WS_URL);
+    threatWsRef.current = ws;
+    ws.onopen = () => console.log("Threat feed connected");
+    ws.onclose = () => setTimeout(connectThreats, 3000);
+    ws.onmessage = (e) => {
+      const threat = JSON.parse(e.data);
+      setThreats(prev => [threat, ...prev].slice(0, 50));
+      setThreatStats(prev => ({
+        total_threats: prev.total_threats + 1,
+        critical: prev.critical + (threat.severity === "CRITICAL" ? 1 : 0),
+        high: prev.high + (threat.severity === "HIGH" ? 1 : 0),
+        medium: prev.medium + (threat.severity === "MEDIUM" ? 1 : 0),
+        low: prev.low + (threat.severity === "LOW" ? 1 : 0),
+        blocked: prev.blocked + (threat.status === "BLOCKED" ? 1 : 0),
+      }));
+    };
+  }
+
   const fraudRate = stats.total > 0 ? ((stats.fraud_detected / stats.total) * 100).toFixed(1) : "0.0";
   const pieData = [{ name: "Legitimate", value: stats.legitimate }, { name: "Fraud", value: stats.fraud_detected }];
   const scoreColor = securityScore > 80 ? "#22c55e" : securityScore > 60 ? "#f59e0b" : "#ef4444";
@@ -135,7 +159,7 @@ export default function App() {
             { name: "Fraud Detection", active: true },
             { name: "Behavioral AI", active: true },
             { name: "API Protection", active: true },
-            { name: "Threat Intel", active: false },
+            { name: "Threat Intel", active: true },
           ].map(m => (
             <div key={m.name} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
               <div style={{ width: 6, height: 6, borderRadius: "50%", background: m.active ? "#22c55e" : "#374151", boxShadow: m.active ? "0 0 6px #22c55e" : "none" }} />
@@ -258,7 +282,9 @@ export default function App() {
               </div>
             </div>
 
-            <TxTable transactions={transactions} />
+            {activeTab === "dashboard" && (
+              <TxTable transactions={transactions} />
+            )}
 
             <div style={{ marginTop: 16, display: "flex", justifyContent: "space-between" }}>
               <div style={{ fontSize: 11, color: "#1e3a5f" }}>Sentinel AI v1.0 — Built for East African Banking Security</div>
@@ -297,31 +323,59 @@ export default function App() {
                 </div>
               ))}
             </div>
-            <div style={card()}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>🚨 Recent Fraud Alerts</div>
-              {alerts.length === 0 && <div style={{ textAlign: "center", padding: 40, color: "#334155" }}>No active threats detected</div>}
-              {alerts.map((a, i) => (
-                <div key={i} style={{ padding: "14px 16px", borderRadius: 8, marginBottom: 8, background: "linear-gradient(90deg, #1c050544, #1f0a0a)", border: "1px solid #7f1d1d" }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: "#ef4444", fontSize: 14 }}>🚫 {a.merchant}</div>
-                      <div style={{ fontSize: 12, color: "#4b6cb7", marginTop: 4 }}>{a.location} · {a.timestamp}</div>
+            {/* Threat Intelligence Panel */}
+            <div style={{ background: "#0f172a", border: "1px solid #1e2a4a", borderRadius: 12, padding: 20 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: "white" }}>Threat Intelligence Feed</div>
+                  <div style={{ fontSize: 11, color: "#4b6cb7", marginTop: 2 }}>Real-time cyber threat detection</div>
+                </div>
+                <div style={{ display: "flex", gap: 12 }}>
+                  {[
+                    { label: "CRITICAL", value: threatStats.critical, color: "#ef4444" },
+                    { label: "HIGH", value: threatStats.high, color: "#f59e0b" },
+                    { label: "BLOCKED", value: threatStats.blocked, color: "#22c55e" },
+                  ].map(s => (
+                    <div key={s.label} style={{ textAlign: "center", background: s.color + "22", padding: "6px 12px", borderRadius: 8, border: `1px solid ${s.color}44` }}>
+                      <div style={{ fontSize: 16, fontWeight: 800, color: s.color }}>{s.value}</div>
+                      <div style={{ fontSize: 9, color: s.color }}>{s.label}</div>
                     </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 18, fontWeight: 800, color: "#ef4444" }}>${a.amount}</div>
-                      <div style={{ fontSize: 11, color: "#f59e0b" }}>{(a.fraud_probability * 100).toFixed(1)}% fraud probability</div>
+                  ))}
+                </div>
+              </div>
+              <div style={{ maxHeight: 500, overflowY: "auto" }}>
+                {threats.map((threat) => (
+                  <div key={threat.id} style={{
+                    padding: "12px 16px", borderRadius: 8, marginBottom: 8,
+                    background: threat.color + "11", border: `1px solid ${threat.color}33`
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 4, background: threat.color + "33", color: threat.color }}>
+                            {threat.severity}
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: "white" }}>{threat.type}</span>
+                        </div>
+                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 4 }}>{threat.description}</div>
+                        <div style={{ fontSize: 10, color: "#4b6cb7" }}>
+                          Source: {threat.source_ip} → Target: {threat.target}
+                        </div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, color: threat.status === "BLOCKED" ? "#22c55e" : "#f59e0b",
+                          background: threat.status === "BLOCKED" ? "#052e16" : "#1c0a00", padding: "3px 8px", borderRadius: 4 }}>
+                          {threat.status === "BLOCKED" ? "🛡 BLOCKED" : "🔍 INVESTIGATING"}
+                        </div>
+                        <div style={{ fontSize: 10, color: "#4b6cb7", marginTop: 4 }}>{threat.timestamp}</div>
+                      </div>
                     </div>
                   </div>
-                  {a.reasons?.length > 0 && (
-                    <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid #7f1d1d44" }}>
-                      <div style={{ fontSize: 10, color: "#4b6cb7", marginBottom: 6 }}>AI REASONS:</div>
-                      {a.reasons.map((r, j) => (
-                        <span key={j} style={{ display: "inline-block", background: "#ef444422", color: "#fca5a5", borderRadius: 4, padding: "2px 8px", fontSize: 10, marginRight: 6 }}>{r.feature}: {r.impact > 0 ? "+" : ""}{r.impact}</span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
+                ))}
+                {threats.length === 0 && (
+                  <div style={{ textAlign: "center", padding: 40, color: "#334155" }}>Connecting to threat feed...</div>
+                )}
+              </div>
             </div>
           </>}
 
